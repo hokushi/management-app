@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, gte, lte, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { eventLogs, events } from "../db/schema.js";
 import { NotFoundError } from "../../errors.js";
@@ -15,7 +15,16 @@ export type EventLog = {
   eventId: number | null;
   title: string;
   amount: number;
-  doneAt: Date;
+  /** YYYY-MM-DD。時刻は持たない。 */
+  doneOn: string;
+};
+
+export type LogFilter = {
+  /** YYYY-MM-DD。この日を含む。 */
+  from?: string;
+  /** YYYY-MM-DD。この日を含む。 */
+  to?: string;
+  limit: number;
 };
 
 export type NewEvent = {
@@ -70,6 +79,14 @@ export const eventRepository = {
   },
 };
 
+const logColumns = {
+  id: eventLogs.id,
+  eventId: eventLogs.eventId,
+  title: eventLogs.title,
+  amount: eventLogs.amount,
+  doneOn: eventLogs.doneOn,
+};
+
 export const eventLogRepository = {
   /** 「やった」記録を1件足す。金額とタイトルは記録時点の値を写して保存する。 */
   async create(input: {
@@ -77,29 +94,27 @@ export const eventLogRepository = {
     eventId: number;
     title: string;
     amount: number;
+    doneOn: string;
   }): Promise<EventLog> {
-    const rows = await db.insert(eventLogs).values(input).returning({
-      id: eventLogs.id,
-      eventId: eventLogs.eventId,
-      title: eventLogs.title,
-      amount: eventLogs.amount,
-      doneAt: eventLogs.doneAt,
-    });
+    const rows = await db.insert(eventLogs).values(input).returning(logColumns);
     return rows[0]!;
   },
 
-  async listByUser(userId: number, limit: number): Promise<EventLog[]> {
+  async listByUser(
+    userId: number,
+    { from, to, limit }: LogFilter,
+  ): Promise<EventLog[]> {
     return db
-      .select({
-        id: eventLogs.id,
-        eventId: eventLogs.eventId,
-        title: eventLogs.title,
-        amount: eventLogs.amount,
-        doneAt: eventLogs.doneAt,
-      })
+      .select(logColumns)
       .from(eventLogs)
-      .where(eq(eventLogs.userId, userId))
-      .orderBy(desc(eventLogs.doneAt), desc(eventLogs.id))
+      .where(
+        and(
+          eq(eventLogs.userId, userId),
+          from ? gte(eventLogs.doneOn, from) : undefined,
+          to ? lte(eventLogs.doneOn, to) : undefined,
+        ),
+      )
+      .orderBy(desc(eventLogs.doneOn), desc(eventLogs.id))
       .limit(limit);
   },
 

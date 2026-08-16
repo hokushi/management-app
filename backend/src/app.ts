@@ -4,12 +4,17 @@ import { healthRoutes } from "./routes/health.js";
 import { userRoutes } from "./routes/user.js";
 import { eventRoutes } from "./routes/event.js";
 import { withCurrentUser } from "./middleware/currentUser.js";
-import { EmailAlreadyExistsError, NotFoundError } from "./errors.js";
+import {
+  EmailAlreadyExistsError,
+  InvalidInputError,
+  NotFoundError,
+} from "./errors.js";
 import { env, isProd } from "./config/env.js";
 
 // ドメインエラーと HTTP ステータスの対応。
 // controller ごとに try/catch を書くと同じ変換が散らばるのでここに集める。
 const ERROR_STATUS: [new (...args: never[]) => Error, number][] = [
+  [InvalidInputError, 400],
   [NotFoundError, 404],
   [EmailAlreadyExistsError, 409],
 ];

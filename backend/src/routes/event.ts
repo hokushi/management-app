@@ -5,6 +5,10 @@ import { eventController } from "../controllers/event.js";
 // 極端な値を弾いておくと、合計が桁あふれする心配をしなくて済む。
 const MAX_AMOUNT = 10_000_000;
 
+// YYYY-MM-DD。実在する日付かどうかまでは見ず、形だけ確認する
+// （2月30日のような値は Postgres の date 型が弾く）。
+const DATE_PATTERN = "^\\d{4}-\\d{2}-\\d{2}$";
+
 const createEventBodySchema = {
   type: "object",
   required: ["title", "amount"],
@@ -18,6 +22,27 @@ const createEventBodySchema = {
       maximum: MAX_AMOUNT,
       not: { const: 0 },
     },
+  },
+} as const;
+
+// 「いつやったか」は必須。既定値をサーバー側で決めると、
+// どのタイムゾーンの「今日」なのかが曖昧になるため呼び出し側に決めさせる。
+const recordBodySchema = {
+  type: "object",
+  required: ["doneOn"],
+  additionalProperties: false,
+  properties: {
+    doneOn: { type: "string", pattern: DATE_PATTERN },
+  },
+} as const;
+
+const logsQuerySchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    from: { type: "string", pattern: DATE_PATTERN },
+    to: { type: "string", pattern: DATE_PATTERN },
+    limit: { type: "integer", minimum: 1, maximum: 500, default: 50 },
   },
 } as const;
 
@@ -53,7 +78,7 @@ export async function eventRoutes(app: FastifyInstance) {
   // イベントを「やった」ことにして記録を1件足す
   app.post(
     "/events/:eventId/logs",
-    { schema: { params: eventParamsSchema } },
+    { schema: { params: eventParamsSchema, body: recordBodySchema } },
     eventController.record,
   );
 
@@ -64,6 +89,13 @@ export async function eventRoutes(app: FastifyInstance) {
     eventController.removeLog,
   );
 
-  // 使える金額と最近の記録
-  app.get("/summary", eventController.summary);
+  // 記録の一覧。from / to で期間を絞れる（カレンダーは表示中の月だけ引く）。
+  app.get(
+    "/logs",
+    { schema: { querystring: logsQuerySchema } },
+    eventController.logs,
+  );
+
+  // 使える金額（全期間の合計）
+  app.get("/balance", eventController.balance);
 }

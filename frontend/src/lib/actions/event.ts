@@ -33,8 +33,15 @@ export async function createEvent(
   return error ? { status: "error", message: error } : { status: "success" };
 }
 
-export async function recordEvent(eventId: number): Promise<string | null> {
-  return send(`/events/${eventId}/logs`, { method: "POST" });
+/** doneOn は "YYYY-MM-DD"。どの日にやったことにするかは呼び出し側が決める。 */
+export async function recordEvent(
+  eventId: number,
+  doneOn: string,
+): Promise<string | null> {
+  return send(`/events/${eventId}/logs`, {
+    method: "POST",
+    body: { doneOn },
+  });
 }
 
 export async function deleteEvent(eventId: number): Promise<string | null> {
@@ -73,7 +80,8 @@ async function send(
       return data?.error ?? "処理に失敗しました";
     }
 
-    revalidatePath("/events");
+    // 残高と記録はカレンダー(/)と一覧(/events)の両方に出るのでまとめて作り直す
+    revalidatePath("/", "layout");
     return null;
   } catch {
     return "サーバーに接続できませんでした";

@@ -2,21 +2,11 @@
 
 import { useState, useTransition } from "react";
 import { deleteLog } from "@/lib/actions/event";
-import { formatSignedYen } from "@/lib/event";
+import { parseDateKey } from "@/lib/calendar";
+import { formatSignedYen, type EventLog } from "@/lib/event";
 import { amountClass } from "./event-list";
 
-/**
- * 日時はサーバー側で文字列にしてから渡す。
- * ブラウザのタイムゾーンで組み立てるとサーバーの描画結果とズレるため。
- */
-export type LogRow = {
-  id: number;
-  title: string;
-  amount: number;
-  doneAtLabel: string;
-};
-
-export function LogList({ logs }: { logs: LogRow[] }) {
+export function LogList({ logs }: { logs: EventLog[] }) {
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -42,9 +32,12 @@ export function LogList({ logs }: { logs: LogRow[] }) {
       <ul className="divide-y divide-zinc-200 overflow-hidden rounded-xl border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-950">
         {logs.map((log) => (
           <li key={log.id} className="flex items-center gap-3 px-4 py-2.5">
-            <span className="shrink-0 text-xs tabular-nums text-zinc-500 dark:text-zinc-400">
-              {log.doneAtLabel}
-            </span>
+            <time
+              dateTime={log.doneOn}
+              className="shrink-0 text-xs tabular-nums text-zinc-500 dark:text-zinc-400"
+            >
+              {formatDoneOn(log.doneOn)}
+            </time>
             <span className="min-w-0 flex-1 truncate text-sm text-zinc-900 dark:text-zinc-100">
               {log.title}
             </span>
@@ -72,4 +65,10 @@ export function LogList({ logs }: { logs: LogRow[] }) {
       </ul>
     </div>
   );
+}
+
+/** 「8/16」の形にする。doneOn は日付だけなのでタイムゾーンの影響を受けない。 */
+function formatDoneOn(doneOn: string): string {
+  const date = parseDateKey(doneOn);
+  return `${date.getMonth() + 1}/${date.getDate()}`;
 }

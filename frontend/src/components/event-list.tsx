@@ -4,7 +4,14 @@ import { useState, useTransition } from "react";
 import { deleteEvent, recordEvent } from "@/lib/actions/event";
 import { formatSignedYen, type Event } from "@/lib/event";
 
-export function EventList({ events }: { events: Event[] }) {
+export function EventList({
+  events,
+  todayKey,
+}: {
+  events: Event[];
+  /** 日本時間での今日（YYYY-MM-DD）。この画面からの記録は今日付けにする。 */
+  todayKey: string;
+}) {
   // エラーは行ごとではなく一覧全体で1つ持つ。同時に複数は起きないため。
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -54,7 +61,7 @@ export function EventList({ events }: { events: Event[] }) {
             <button
               type="button"
               disabled={isPending}
-              onClick={() => run(() => recordEvent(event.id))}
+              onClick={() => run(() => recordEvent(event.id, todayKey))}
               className="shrink-0 rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
             >
               やった

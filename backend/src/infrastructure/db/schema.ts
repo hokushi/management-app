@@ -1,5 +1,6 @@
 import {
   bigint,
+  date,
   index,
   integer,
   pgTable,
@@ -69,9 +70,12 @@ export const eventLogs = pgTable(
     ),
     title: text("title").notNull(),
     amount: integer("amount").notNull(),
-    doneAt: timestamp("done_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
+    // 「どの日にやったか」は日付であって時刻ではない。
+    // timestamp で持つとタイムゾーン次第で前日/翌日に寄ってしまい、
+    // カレンダーのどのマスに出すかが環境で変わる。date なら曖昧さが無い。
+    // 既定値は置かない。UTC の current_date だと日本時間の深夜にズレるので、
+    // 常に呼び出し側が「その人にとっての日付」を明示して渡す。
+    doneOn: date("done_on").notNull(),
   },
   // 残高も履歴も「あるユーザーの分」を引くので、user_id に索引を張る
   (table) => [index("event_logs_user_id_idx").on(table.userId)],

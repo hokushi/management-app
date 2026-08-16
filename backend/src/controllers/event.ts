@@ -7,6 +7,8 @@ import { eventService } from "../services/event.js";
 type EventParams = { eventId: number };
 type LogParams = { logId: number };
 type CreateEventBody = { title: string; amount: number };
+type RecordBody = { doneOn: string };
+type LogsQuery = { from?: string; to?: string; limit: number };
 
 export const eventController = {
   async list(request: FastifyRequest) {
@@ -33,12 +35,13 @@ export const eventController = {
   },
 
   async record(
-    request: FastifyRequest<{ Params: EventParams }>,
+    request: FastifyRequest<{ Params: EventParams; Body: RecordBody }>,
     reply: FastifyReply,
   ) {
     const log = await eventService.record(
       request.currentUserId,
       request.params.eventId,
+      request.body.doneOn,
     );
     return reply.code(201).send({ log });
   },
@@ -51,7 +54,11 @@ export const eventController = {
     return reply.code(204).send();
   },
 
-  async summary(request: FastifyRequest) {
-    return eventService.summary(request.currentUserId);
+  async balance(request: FastifyRequest) {
+    return { balance: await eventService.balance(request.currentUserId) };
+  },
+
+  async logs(request: FastifyRequest<{ Querystring: LogsQuery }>) {
+    return { logs: await eventService.logs(request.currentUserId, request.query) };
   },
 };

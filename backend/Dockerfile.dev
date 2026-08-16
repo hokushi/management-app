@@ -42,7 +42,7 @@ WORKDIR /app/backend
 
 EXPOSE 4000
 
-# スキーマを反映してから dev サーバーを起動する。
+# スキーマを反映してから dev サーバーを起動する（詳細は起動スクリプト内のコメント）。
 # pnpm 経由だと毎回ワークスペース全体の依存チェック（未承認ビルドで失敗）が走るため、
-# バイナリを直接叩く。tsx watch でホットリロード。
-CMD ["sh", "-c", "node_modules/.bin/drizzle-kit push && node_modules/.bin/tsx watch src/server.ts"]
+# スクリプト内ではバイナリを直接叩いている。tsx watch でホットリロード。
+CMD ["sh", "docker-entrypoint.dev.sh"]

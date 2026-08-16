@@ -3,16 +3,9 @@ import {
   eventRepository,
   type Event,
   type EventLog,
+  type LogFilter,
 } from "../infrastructure/repositories/event.js";
-
-// 履歴は「最近どれくらい使ったか」を見るためのものなので、全件は返さない
-const LOG_LIMIT = 50;
-
-export type Summary = {
-  /** 使える金額。記録の合計。 */
-  balance: number;
-  logs: EventLog[];
-};
+import { InvalidInputError } from "../errors.js";
 
 export const eventService = {
   async list(userId: number): Promise<Event[]> {
@@ -36,13 +29,19 @@ export const eventService = {
    * 金額はイベントから写して保存するので、あとでイベントを直しても
    * この記録は変わらない。
    */
-  async record(userId: number, eventId: number): Promise<EventLog> {
+  async record(
+    userId: number,
+    eventId: number,
+    doneOn: string,
+  ): Promise<EventLog> {
+    assertRealDate(doneOn);
     const event = await eventRepository.findByIdForUser(eventId, userId);
     return eventLogRepository.create({
       userId,
       eventId: event.id,
       title: event.title,
       amount: event.amount,
+      doneOn,
     });
   },
 
@@ -51,11 +50,31 @@ export const eventService = {
     return eventLogRepository.removeById(logId, userId);
   },
 
-  async summary(userId: number): Promise<Summary> {
-    const [balance, logs] = await Promise.all([
-      eventLogRepository.sumByUser(userId),
-      eventLogRepository.listByUser(userId, LOG_LIMIT),
-    ]);
-    return { balance, logs };
+  /** 使える金額。全期間の合計なので期間で絞らない。 */
+  async balance(userId: number): Promise<number> {
+    return eventLogRepository.sumByUser(userId);
+  },
+
+  async logs(userId: number, filter: LogFilter): Promise<EventLog[]> {
+    return eventLogRepository.listByUser(userId, filter);
   },
 };
+
+/**
+ * YYYY-MM-DD が実在する日付か確かめる。
+ * ルートの JSON スキーマは形しか見ないので、2月30日のような値はここで弾く
+ * （そのまま INSERT すると Postgres のエラーになり 500 で返ってしまう）。
+ */
+function assertRealDate(dateKey: string): void {
+  // 既定値の 0 は形が壊れているときだけ使われ、その場合は下の判定で弾かれる
+  const [year = 0, month = 0, day = 0] = dateKey.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  const isReal =
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day;
+
+  if (!isReal) {
+    throw new InvalidInputError(`${dateKey} は存在しない日付です`);
+  }
+}

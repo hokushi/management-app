@@ -3,6 +3,14 @@
 // 上位層（service / controller）は DB の詳細を知らずに済むようにする。
 // 機能を足すたびにここへエラーを追加していく。
 
+// 入力が不正。JSON スキーマだけでは表せない条件（実在する日付か等）に使う。
+export class InvalidInputError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "InvalidInputError";
+  }
+}
+
 // メールアドレスの重複。users.email の UNIQUE 制約違反をこれに変換する。
 export class EmailAlreadyExistsError extends Error {
   constructor(message = "このメールアドレスは既に登録されています") {

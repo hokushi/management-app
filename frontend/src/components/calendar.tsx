@@ -1,89 +1,78 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useState } from "react";
+import Link from "next/link";
 import {
   WEEKDAY_LABELS,
   addMonths,
   buildMonthWeeks,
   formatYearMonth,
-  isSameDay,
-  toDateKey,
-  toYearMonth,
+  isSameYearMonth,
+  toMonthParam,
+  yearMonthOfDateKey,
   type YearMonth,
 } from "@/lib/calendar";
+import { formatSignedYen, type Event, type EventLog } from "@/lib/event";
+import { DayDialog } from "./day-dialog";
 
-const navButtonClass =
-  "flex h-9 items-center justify-center rounded-md border border-zinc-200 px-3 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-900 dark:focus-visible:outline-zinc-100";
+// 1マスに出す記録の数。これを超えた分は「他 n件」にまとめる。
+const MAX_LOGS_PER_CELL = 2;
 
-// ハイドレーションが済んだかだけを見る。値は変わらないので購読は何もしない。
-const subscribeNothing = () => () => {};
+const navLinkClass =
+  "flex h-9 items-center justify-center rounded-md border border-zinc-200 px-3 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-900";
 
-export function Calendar() {
-  // 「今日」はブラウザのタイムゾーンで決まるので、サーバー側の描画結果と
-  // ズレうる（このページは静的生成されるのでビルド時の日付で焼かれる）。
-  // ハイドレーションが終わるまでは骨組みだけ出し、日付には触れない。
-  const isHydrated = useSyncExternalStore(
-    subscribeNothing,
-    () => true,
-    () => false,
-  );
-
-  const [today] = useState(() => new Date());
-  // null は「まだ月を動かしていない」= 今月を表示、の意味。
-  const [selectedMonth, setSelectedMonth] = useState<YearMonth | null>(null);
-  const viewMonth = selectedMonth ?? toYearMonth(today);
-
-  if (!isHydrated) {
-    return (
-      <div
-        className="min-h-[34rem] w-full rounded-xl border border-zinc-200 dark:border-zinc-800"
-        aria-busy="true"
-        aria-label="カレンダーを読み込んでいます"
-      />
-    );
-  }
+export function Calendar({
+  viewMonth,
+  todayKey,
+  events,
+  logsByDate,
+}: {
+  viewMonth: YearMonth;
+  /** 日本時間での今日（YYYY-MM-DD）。サーバーで決めて渡す。 */
+  todayKey: string;
+  events: Event[];
+  logsByDate: Record<string, EventLog[]>;
+}) {
+  // 開いている日。null なら閉じている。
+  const [openDateKey, setOpenDateKey] = useState<string | null>(null);
 
   const weeks = buildMonthWeeks(viewMonth);
-  const isViewingCurrentMonth =
-    viewMonth.year === today.getFullYear() &&
-    viewMonth.month === today.getMonth();
+  const isViewingCurrentMonth = isSameYearMonth(
+    viewMonth,
+    yearMonthOfDateKey(todayKey),
+  );
 
   return (
     <section className="w-full overflow-hidden rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
       <header className="flex items-center justify-between gap-4 border-b border-zinc-200 px-4 py-3 dark:border-zinc-800 sm:px-6 sm:py-4">
-        <h1
-          className="text-lg font-semibold tabular-nums text-zinc-900 dark:text-zinc-50 sm:text-xl"
-          aria-live="polite"
-        >
+        <h2 className="text-lg font-semibold tabular-nums text-zinc-900 dark:text-zinc-50 sm:text-xl">
           {formatYearMonth(viewMonth)}
-        </h1>
+        </h2>
 
+        {/* 月移動は URL に持たせる。表示中の月の記録だけをサーバーで引くため。 */}
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            className={navButtonClass}
-            onClick={() => setSelectedMonth(addMonths(viewMonth, -1))}
+          <Link
+            href={`/?month=${toMonthParam(addMonths(viewMonth, -1))}`}
+            className={navLinkClass}
             aria-label="前の月"
           >
             ←
-          </button>
-          <button
-            type="button"
-            className={navButtonClass}
-            onClick={() => setSelectedMonth(toYearMonth(today))}
-            disabled={isViewingCurrentMonth}
+          </Link>
+          <Link
+            href="/"
             aria-label="今月に戻る"
+            aria-disabled={isViewingCurrentMonth}
+            className={`${navLinkClass} ${isViewingCurrentMonth ? "pointer-events-none opacity-40" : ""}`}
           >
             今日
-          </button>
-          <button
-            type="button"
-            className={navButtonClass}
-            onClick={() => setSelectedMonth(addMonths(viewMonth, 1))}
+          </Link>
+          <Link
+            href={`/?month=${toMonthParam(addMonths(viewMonth, 1))}`}
+            className={navLinkClass}
             aria-label="次の月"
           >
             →
-          </button>
+          </Link>
         </div>
       </header>
 
@@ -101,29 +90,66 @@ export function Calendar() {
       {/* 罫線は各セルの上/左ボーダーで引き、外周は親の border に任せる */}
       <div className="grid grid-cols-7">
         {weeks.map((week, weekIndex) =>
-          week.map(({ date, isCurrentMonth }, weekday) => (
-            <div
-              key={toDateKey(date)}
-              className={`min-h-20 border-zinc-200 p-1.5 dark:border-zinc-800 sm:min-h-24 sm:p-2 ${
-                weekIndex > 0 ? "border-t" : ""
-              } ${weekday > 0 ? "border-l" : ""} ${
-                isCurrentMonth ? "" : "bg-zinc-50/70 dark:bg-zinc-900/40"
-              }`}
-            >
-              <time
-                dateTime={toDateKey(date)}
-                className={`flex h-6 w-6 items-center justify-center rounded-full text-sm tabular-nums ${
-                  isSameDay(date, today)
-                    ? "bg-zinc-900 font-semibold text-white dark:bg-zinc-100 dark:text-zinc-900"
-                    : weekdayTextClass(weekday, isCurrentMonth)
+          week.map(({ dateKey, date, isCurrentMonth }, weekday) => {
+            const logs = logsByDate[dateKey] ?? [];
+            const isToday = dateKey === todayKey;
+
+            return (
+              <button
+                key={dateKey}
+                type="button"
+                onClick={() => setOpenDateKey(dateKey)}
+                aria-label={`${date.getMonth() + 1}月${date.getDate()}日の記録`}
+                className={`flex min-h-20 flex-col items-stretch gap-1 border-zinc-200 p-1.5 text-left transition-colors hover:bg-zinc-100 dark:border-zinc-800 dark:hover:bg-zinc-900 sm:min-h-24 sm:p-2 ${
+                  weekIndex > 0 ? "border-t" : ""
+                } ${weekday > 0 ? "border-l" : ""} ${
+                  isCurrentMonth ? "" : "bg-zinc-50/70 dark:bg-zinc-900/40"
                 }`}
               >
-                {date.getDate()}
-              </time>
-            </div>
-          )),
+                <time
+                  dateTime={dateKey}
+                  className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-sm tabular-nums ${
+                    isToday
+                      ? "bg-zinc-900 font-semibold text-white dark:bg-zinc-100 dark:text-zinc-900"
+                      : weekdayTextClass(weekday, isCurrentMonth)
+                  }`}
+                >
+                  {date.getDate()}
+                </time>
+
+                <span className="flex min-w-0 flex-col gap-0.5">
+                  {logs.slice(0, MAX_LOGS_PER_CELL).map((log) => (
+                    <span
+                      key={log.id}
+                      className={`truncate rounded px-1 text-[11px] leading-4 ${
+                        log.amount < 0
+                          ? "bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-400"
+                          : "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400"
+                      }`}
+                    >
+                      {formatSignedYen(log.amount)} {log.title}
+                    </span>
+                  ))}
+                  {logs.length > MAX_LOGS_PER_CELL && (
+                    <span className="px-1 text-[11px] leading-4 text-zinc-500 dark:text-zinc-400">
+                      他 {logs.length - MAX_LOGS_PER_CELL}件
+                    </span>
+                  )}
+                </span>
+              </button>
+            );
+          }),
         )}
       </div>
+
+      {openDateKey && (
+        <DayDialog
+          dateKey={openDateKey}
+          events={events}
+          logs={logsByDate[openDateKey] ?? []}
+          onClose={() => setOpenDateKey(null)}
+        />
+      )}
     </section>
   );
 }

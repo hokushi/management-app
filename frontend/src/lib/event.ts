@@ -15,13 +15,20 @@ export type EventLog = {
   eventId: number | null;
   title: string;
   amount: number;
-  doneAt: string;
+  /** YYYY-MM-DD。時刻は持たない。 */
+  doneOn: string;
 };
 
-export type Summary = {
-  balance: number;
-  logs: EventLog[];
-};
+/** 記録を日付ごとにまとめる。カレンダーのマスに置くために使う。 */
+export function groupLogsByDate(
+  logs: EventLog[],
+): Record<string, EventLog[]> {
+  const grouped: Record<string, EventLog[]> = {};
+  for (const log of logs) {
+    (grouped[log.doneOn] ??= []).push(log);
+  }
+  return grouped;
+}
 
 /**
  * 3桁ごとにカンマを入れる。
