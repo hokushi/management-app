@@ -3,8 +3,7 @@
 import { useState, useTransition } from "react";
 import { deleteLog } from "@/lib/actions/event";
 import { parseDateKey } from "@/lib/calendar";
-import { formatSignedYen, type EventLog } from "@/lib/event";
-import { amountClass } from "./event-list";
+import { amountClass, formatSignedYen, type EventLog } from "@/lib/event";
 
 export function LogList({ logs }: { logs: EventLog[] }) {
   const [error, setError] = useState<string | null>(null);

@@ -50,3 +50,10 @@ export function formatYen(amount: number): string {
 export function formatSignedYen(amount: number): string {
   return `${amount < 0 ? "-" : "+"}¥${group(amount)}`;
 }
+
+/** 増える金額は緑、減る金額は赤。 */
+export function amountClass(amount: number): string {
+  return amount < 0
+    ? "text-red-600 dark:text-red-400"
+    : "text-emerald-600 dark:text-emerald-400";
+}

@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { deleteEvent, recordEvent } from "@/lib/actions/event";
-import { formatSignedYen, type Event } from "@/lib/event";
+import { amountClass, formatSignedYen, type Event } from "@/lib/event";
 
 export function EventList({
   events,
@@ -81,10 +81,4 @@ export function EventList({
       </ul>
     </div>
   );
-}
-
-export function amountClass(amount: number): string {
-  return amount < 0
-    ? "text-red-600 dark:text-red-400"
-    : "text-emerald-600 dark:text-emerald-400";
 }

@@ -3,7 +3,12 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { deleteLog, recordEvent } from "@/lib/actions/event";
 import { WEEKDAY_LABELS, parseDateKey } from "@/lib/calendar";
-import { formatSignedYen, type Event, type EventLog } from "@/lib/event";
+import {
+  amountClass,
+  formatSignedYen,
+  type Event,
+  type EventLog,
+} from "@/lib/event";
 
 export function DayDialog({
   dateKey,
@@ -85,11 +90,7 @@ export function DayDialog({
                     {log.title}
                   </span>
                   <span
-                    className={`shrink-0 text-sm font-medium tabular-nums ${
-                      log.amount < 0
-                        ? "text-red-600 dark:text-red-400"
-                        : "text-emerald-600 dark:text-emerald-400"
-                    }`}
+                    className={`shrink-0 text-sm font-medium tabular-nums ${amountClass(log.amount)}`}
                   >
                     {formatSignedYen(log.amount)}
                   </span>
@@ -123,11 +124,7 @@ export function DayDialog({
                     {event.title}
                   </span>
                   <span
-                    className={`shrink-0 text-sm font-medium tabular-nums ${
-                      event.amount < 0
-                        ? "text-red-600 dark:text-red-400"
-                        : "text-emerald-600 dark:text-emerald-400"
-                    }`}
+                    className={`shrink-0 text-sm font-medium tabular-nums ${amountClass(event.amount)}`}
                   >
                     {formatSignedYen(event.amount)}
                   </span>
