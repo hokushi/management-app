@@ -1,6 +1,7 @@
-import Fastify, { type FastifyInstance } from "fastify";
+import Fastify, { type FastifyError, type FastifyInstance } from "fastify";
 import cors from "@fastify/cors";
 import { healthRoutes } from "./routes/health.js";
+import { userRoutes } from "./routes/user.js";
 import { env, isProd } from "./config/env.js";
 
 export function buildApp(): FastifyInstance {
@@ -24,12 +25,33 @@ export function buildApp(): FastifyInstance {
     credentials: true,
   });
 
+  // エラーのレスポンス形式を { error: string } に統一する。
+  // Fastify の既定は検証エラーが { error: "Bad Request", message: "詳細" }、
+  // 自前のエラーが { error: "詳細" } と二重になり、呼び出し側が
+  // どちらを読めばいいか分からなくなるため。
+  app.setErrorHandler((error: FastifyError, request, reply) => {
+    if (error.validation) {
+      return reply.code(400).send({ error: error.message });
+    }
+
+    const statusCode = error.statusCode ?? 500;
+    if (statusCode >= 500) {
+      request.log.error(error);
+      // 内部エラーの詳細は外に出さない
+      return reply.code(statusCode).send({ error: "サーバーエラーが発生しました" });
+    }
+
+    return reply.code(statusCode).send({ error: error.message });
+  });
+
   // --- 公開ルート（認証不要） ---
   app.get("/", async () => {
     return { service: "management-app backend", health: "/health" };
   });
 
   app.register(healthRoutes);
+  // ログイン機能はまだ無いので、ユーザー作成は公開ルートに置いている。
+  app.register(userRoutes);
 
   // --- 認証必須ルート ---
   // 認証を入れるときは、このスコープに preHandler フックを付けて

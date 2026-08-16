@@ -3,6 +3,14 @@
 // 上位層（service / controller）は DB の詳細を知らずに済むようにする。
 // 機能を足すたびにここへエラーを追加していく。
 
+// メールアドレスの重複。users.email の UNIQUE 制約違反をこれに変換する。
+export class EmailAlreadyExistsError extends Error {
+  constructor(message = "このメールアドレスは既に登録されています") {
+    super(message);
+    this.name = "EmailAlreadyExistsError";
+  }
+}
+
 // リソースが存在しない、またはアクセス権がない。
 // 「他人のリソースの有無」を漏らさないため、未所有も未存在と同じ扱いにする。
 export class NotFoundError extends Error {
