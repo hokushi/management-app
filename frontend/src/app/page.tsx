@@ -44,7 +44,8 @@ export default async function Home(props: PageProps<"/">) {
       `/logs?from=${from}&to=${to}&limit=500`,
       user.id,
     ),
-    serverGetAsUser<{ events: Event[] }>("/events", user.id),
+    // ?on= を付けると、その日に記録した場合の金額（nextAmount）が付いてくる
+    serverGetAsUser<{ events: Event[] }>(`/events?on=${todayKey}`, user.id),
   ]);
 
   const events = eventsData?.events ?? [];

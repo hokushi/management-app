@@ -2,7 +2,12 @@
 
 import { useRef, useState, useTransition } from "react";
 import { createEvent, deleteEvent, recordEvent } from "@/lib/actions/event";
-import { amountClass, formatSignedYen, type Event } from "@/lib/event";
+import {
+  amountClass,
+  formatSignedYen,
+  type Event,
+  type EventKind,
+} from "@/lib/event";
 
 const inputClass =
   "w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 focus-visible:border-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:focus-visible:border-zinc-100";
@@ -135,17 +140,31 @@ function Group({
             <li key={event.id} className="flex items-stretch gap-1">
               <button
                 type="button"
-                disabled={isPending}
+                // nextAmount が null の日は記録できない
+                // （リセットのイベントを記録した日は積み上がる方は発生しない）
+                disabled={isPending || event.nextAmount === null}
                 onClick={() => onRecord(event)}
-                className="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-left text-sm transition-colors hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-800 dark:hover:bg-zinc-800"
+                title={
+                  event.nextAmount === null
+                    ? "今日はもう記録済みか、リセットのイベントを記録しているため押せません"
+                    : undefined
+                }
+                className="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-left text-sm transition-colors hover:bg-zinc-100 disabled:opacity-40 disabled:hover:bg-transparent dark:border-zinc-800 dark:hover:bg-zinc-800"
               >
-                <span className="min-w-0 flex-1 truncate text-zinc-900 dark:text-zinc-100">
-                  {event.title}
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-zinc-900 dark:text-zinc-100">
+                    {event.title}
+                  </span>
+                  <span className="block truncate text-xs text-zinc-500 dark:text-zinc-400">
+                    {eventNote(event)}
+                  </span>
                 </span>
                 <span
                   className={`shrink-0 font-semibold tabular-nums ${amountClass(event.amount)}`}
                 >
-                  {formatSignedYen(event.amount)}
+                  {event.nextAmount === null
+                    ? "—"
+                    : formatSignedYen(event.nextAmount)}
                 </span>
               </button>
 
@@ -164,6 +183,18 @@ function Group({
       )}
     </div>
   );
+}
+
+/** ボタンの2行目。積み上げ幅やリセットの有無など、金額だけでは分からないことを出す。 */
+function eventNote(event: Event): string {
+  const notes: string[] = [];
+  if (event.kind === "streak") {
+    notes.push(`${formatSignedYen(event.amount)}ずつ積み上げ`);
+  }
+  if (event.resetsStreak) {
+    notes.push("積み上げをリセット");
+  }
+  return notes.join(" / ");
 }
 
 function AddEventDialog() {
@@ -203,6 +234,8 @@ function AddEventDialog() {
 function AddEventForm({ onClose }: { onClose: () => void }) {
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  // 種類によってラベルと説明が変わるので、選択内容を持っておく
+  const [kind, setKind] = useState<EventKind>("fixed");
 
   // action に関数を渡すと React が FormData を入れて呼んでくれる。
   // useActionState は使わない。成功時にその場で閉じたいので、
@@ -246,6 +279,30 @@ function AddEventForm({ onClose }: { onClose: () => void }) {
         />
       </div>
 
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor="event-kind" className="text-sm font-medium">
+          種類
+        </label>
+        <select
+          id="event-kind"
+          name="kind"
+          value={kind}
+          onChange={(changeEvent) =>
+            setKind(changeEvent.target.value as EventKind)
+          }
+          className={inputClass}
+        >
+          <option value="fixed">毎回同じ額</option>
+          <option value="streak">やるたびに増える</option>
+        </select>
+        {kind === "streak" && (
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">
+            1回目・2回目・3回目…と、下の額ずつ積み上がります。
+            「積み上げをリセット」を付けたイベントを記録すると振り出しに戻ります。
+          </p>
+        )}
+      </div>
+
       <div className="flex gap-3">
         <div className="flex flex-col gap-1.5">
           <label htmlFor="event-direction" className="text-sm font-medium">
@@ -263,7 +320,7 @@ function AddEventForm({ onClose }: { onClose: () => void }) {
 
         <div className="flex min-w-0 flex-1 flex-col gap-1.5">
           <label htmlFor="event-amount" className="text-sm font-medium">
-            金額（円）
+            {kind === "streak" ? "増え幅（円）" : "金額（円）"}
           </label>
           <input
             id="event-amount"
@@ -278,6 +335,20 @@ function AddEventForm({ onClose }: { onClose: () => void }) {
           />
         </div>
       </div>
+
+      <label className="flex items-start gap-2 text-sm">
+        <input
+          name="resetsStreak"
+          type="checkbox"
+          className="mt-0.5 h-4 w-4 shrink-0 accent-zinc-900 dark:accent-zinc-100"
+        />
+        <span>
+          積み上げをリセットする
+          <span className="block text-xs text-zinc-500 dark:text-zinc-400">
+            これを記録した日は積み上がるイベントが発生せず、翌日から最初の額に戻ります。
+          </span>
+        </span>
+      </label>
 
       <div className="flex justify-end gap-2">
         <button

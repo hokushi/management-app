@@ -6,13 +6,21 @@ import { eventService } from "../services/event.js";
 
 type EventParams = { eventId: number };
 type LogParams = { logId: number };
-type CreateEventBody = { title: string; amount: number };
+type CreateEventBody = {
+  title: string;
+  amount: number;
+  kind: "fixed" | "streak";
+  resetsStreak: boolean;
+};
 type RecordBody = { doneOn: string };
 type LogsQuery = { from?: string; to?: string; limit: number };
+type EventsQuery = { on?: string };
 
 export const eventController = {
-  async list(request: FastifyRequest) {
-    return { events: await eventService.list(request.currentUserId) };
+  async list(request: FastifyRequest<{ Querystring: EventsQuery }>) {
+    return {
+      events: await eventService.list(request.currentUserId, request.query.on),
+    };
   },
 
   async create(

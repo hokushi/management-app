@@ -1,12 +1,27 @@
 // イベント関連で server / client の両方から参照する型とフォーマット。
 
+/**
+ * "fixed"  … 毎回 amount ちょうど。
+ * "streak" … 記録するたびに amount ずつ積み上がる（1回目 +50、2回目 +100…）。
+ */
+export type EventKind = "fixed" | "streak";
+
 /** 「やること」のテンプレート。日付は持たない。 */
 export type Event = {
   id: number;
   title: string;
-  /** 円。正なら使える金額が増え、負なら減る。 */
+  /** 円。fixed なら金額そのもの、streak なら1回あたりの増え幅。 */
   amount: number;
+  kind: EventKind;
+  /** 記録すると積み上げが振り出しに戻る（例: ギャンブル）。 */
+  resetsStreak: boolean;
   createdAt: string;
+  /**
+   * その日に記録したらいくらになるか。null なら記録できない
+   * （リセットのイベントを記録した日は積み上がる方は発生しない）。
+   * backend に ?on=YYYY-MM-DD を付けて取得したときだけ入る。
+   */
+  nextAmount: number | null;
 };
 
 /** 「やった」記録。 */

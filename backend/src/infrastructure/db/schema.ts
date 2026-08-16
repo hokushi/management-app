@@ -1,5 +1,8 @@
+import { sql } from "drizzle-orm";
 import {
   bigint,
+  boolean,
+  check,
   date,
   index,
   integer,
@@ -33,21 +36,39 @@ export const users = pgTable("users", {
 
 // events: 「やること」のテンプレート。日付は持たない。
 // 例:「ジムに行く +500」「コンビニ -300」。やるたびに event_logs が1件増える。
-// amount は円。正なら使える金額が増え、負なら減る。
-export const events = pgTable("events", {
-  id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
-  userId: bigint("user_id", { mode: "number" })
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  title: text("title").notNull(),
-  amount: integer("amount").notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
+//
+// kind:
+//   "fixed"  … 毎回 amount ちょうど。
+//   "streak" … 記録するたびに amount ずつ積み上がる。
+//              1回目 +amount、2回目 +amount*2、3回目 +amount*3…。
+//              resetsStreak のイベントを記録すると振り出しに戻る。
+//              日を飛ばしても積み上げは維持される（リセットするのは
+//              resetsStreak のイベントだけ）ので、数えるのは日数ではなく回数。
+export const events = pgTable(
+  "events",
+  {
+    id: bigint("id", { mode: "number" })
+      .primaryKey()
+      .generatedAlwaysAsIdentity(),
+    userId: bigint("user_id", { mode: "number" })
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    amount: integer("amount").notNull(),
+    kind: text("kind").notNull().default("fixed"),
+    // 記録すると streak を振り出しに戻す（例: ギャンブル）
+    resetsStreak: boolean("resets_streak").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    check("events_kind_check", sql`${table.kind} in ('fixed', 'streak')`),
+  ],
+);
 
 // event_logs:「やった」記録。使える金額はこのテーブルの amount の合計。
 //
@@ -70,6 +91,9 @@ export const eventLogs = pgTable(
     ),
     title: text("title").notNull(),
     amount: integer("amount").notNull(),
+    // 元のイベントの resetsStreak を写して持つ。
+    // イベントを消しても「この日にリセットが起きた」事実は残す必要があるため。
+    resetsStreak: boolean("resets_streak").notNull().default(false),
     // 「どの日にやったか」は日付であって時刻ではない。
     // timestamp で持つとタイムゾーン次第で前日/翌日に寄ってしまい、
     // カレンダーのどのマスに出すかが環境で変わる。date なら曖昧さが無い。

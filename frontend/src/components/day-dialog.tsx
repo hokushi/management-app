@@ -123,10 +123,20 @@ export function DayDialog({
                   <span className="min-w-0 flex-1 truncate text-sm">
                     {event.title}
                   </span>
+                  {/*
+                    積み上がるイベントの額はその日までの記録数で決まる。
+                    ここは今日以外の日も開けるので、確定額ではなく増え幅を出し、
+                    実際の額は記録するときにサーバー側で計算させる。
+                  */}
                   <span
                     className={`shrink-0 text-sm font-medium tabular-nums ${amountClass(event.amount)}`}
                   >
                     {formatSignedYen(event.amount)}
+                    {event.kind === "streak" && (
+                      <span className="ml-1 text-xs font-normal text-zinc-500 dark:text-zinc-400">
+                        ずつ
+                      </span>
+                    )}
                   </span>
                   <button
                     type="button"

@@ -16,12 +16,24 @@ const createEventBodySchema = {
   properties: {
     title: { type: "string", minLength: 1, maxLength: 50 },
     // 正なら使える金額が増え、負なら減る。0 は記録しても意味が無いので弾く。
+    // kind が "streak" のときは1回あたりの増え幅として使う。
     amount: {
       type: "integer",
       minimum: -MAX_AMOUNT,
       maximum: MAX_AMOUNT,
       not: { const: 0 },
     },
+    kind: { type: "string", enum: ["fixed", "streak"], default: "fixed" },
+    resetsStreak: { type: "boolean", default: false },
+  },
+} as const;
+
+const eventsQuerySchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    // 指定するとその日に記録した場合の金額（nextAmount）が付く
+    on: { type: "string", pattern: DATE_PATTERN },
   },
 } as const;
 
@@ -61,7 +73,11 @@ const logParamsSchema = {
 
 export async function eventRoutes(app: FastifyInstance) {
   // 呼び出し側のスコープで withCurrentUser が適用されている前提
-  app.get("/events", eventController.list);
+  app.get(
+    "/events",
+    { schema: { querystring: eventsQuerySchema } },
+    eventController.list,
+  );
 
   app.post(
     "/events",

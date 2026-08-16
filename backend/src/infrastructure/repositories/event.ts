@@ -1,12 +1,17 @@
-import { and, desc, eq, gte, lte, sql } from "drizzle-orm";
+import { and, desc, eq, gt, gte, lt, lte, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { eventLogs, events } from "../db/schema.js";
 import { NotFoundError } from "../../errors.js";
+
+/** "fixed" は毎回同額、"streak" は記録するたびに amount ずつ積み上がる。 */
+export type EventKind = "fixed" | "streak";
 
 export type Event = {
   id: number;
   title: string;
   amount: number;
+  kind: EventKind;
+  resetsStreak: boolean;
   createdAt: Date;
 };
 
@@ -31,12 +36,16 @@ export type NewEvent = {
   userId: number;
   title: string;
   amount: number;
+  kind: EventKind;
+  resetsStreak: boolean;
 };
 
 const eventColumns = {
   id: events.id,
   title: events.title,
   amount: events.amount,
+  kind: sql<EventKind>`${events.kind}`.as("kind"),
+  resetsStreak: events.resetsStreak,
   createdAt: events.createdAt,
 };
 
@@ -94,6 +103,7 @@ export const eventLogRepository = {
     eventId: number;
     title: string;
     amount: number;
+    resetsStreak: boolean;
     doneOn: string;
   }): Promise<EventLog> {
     const rows = await db.insert(eventLogs).values(input).returning(logColumns);
@@ -130,6 +140,85 @@ export const eventLogRepository = {
       .where(eq(eventLogs.userId, userId));
 
     return Number(rows[0]?.total ?? 0);
+  },
+
+  /**
+   * その日より前で、いちばん最近リセットが起きた日。1度も無ければ null。
+   * streak を「どこから数え直すか」の起点になる。
+   */
+  async lastResetBefore(userId: number, date: string): Promise<string | null> {
+    const rows = await db
+      .select({ doneOn: sql<string | null>`max(${eventLogs.doneOn})` })
+      .from(eventLogs)
+      .where(
+        and(
+          eq(eventLogs.userId, userId),
+          eq(eventLogs.resetsStreak, true),
+          lt(eventLogs.doneOn, date),
+        ),
+      );
+    return rows[0]?.doneOn ?? null;
+  },
+
+  /** そのイベントをその日にもう記録しているか。 */
+  async hasLogOn(
+    userId: number,
+    eventId: number,
+    date: string,
+  ): Promise<boolean> {
+    const rows = await db
+      .select({ id: eventLogs.id })
+      .from(eventLogs)
+      .where(
+        and(
+          eq(eventLogs.userId, userId),
+          eq(eventLogs.eventId, eventId),
+          eq(eventLogs.doneOn, date),
+        ),
+      )
+      .limit(1);
+    return rows.length > 0;
+  },
+
+  /** その日にリセットのイベントを記録しているか。 */
+  async hasResetOn(userId: number, date: string): Promise<boolean> {
+    const rows = await db
+      .select({ id: eventLogs.id })
+      .from(eventLogs)
+      .where(
+        and(
+          eq(eventLogs.userId, userId),
+          eq(eventLogs.resetsStreak, true),
+          eq(eventLogs.doneOn, date),
+        ),
+      )
+      .limit(1);
+    return rows.length > 0;
+  },
+
+  /**
+   * あるイベントを、リセット以降・その日より前に何回記録したか。
+   * これが streak の「何回目か」になる（日数ではなく回数で数える。
+   * 日を飛ばしても積み上げは維持される仕様のため）。
+   */
+  async countForStreak(
+    userId: number,
+    eventId: number,
+    after: string | null,
+    before: string,
+  ): Promise<number> {
+    const rows = await db
+      .select({ count: sql<string>`count(*)` })
+      .from(eventLogs)
+      .where(
+        and(
+          eq(eventLogs.userId, userId),
+          eq(eventLogs.eventId, eventId),
+          lt(eventLogs.doneOn, before),
+          after ? gt(eventLogs.doneOn, after) : undefined,
+        ),
+      );
+    return Number(rows[0]?.count ?? 0);
   },
 
   async removeById(id: number, userId: number): Promise<void> {
