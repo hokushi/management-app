@@ -4,33 +4,23 @@ import { revalidatePath } from "next/cache";
 import { API_BASE } from "@/lib/server-api";
 import { getCurrentUser } from "@/lib/current-user";
 
-export type CreateEventState =
-  | { status: "idle" }
-  | { status: "success" }
-  | { status: "error"; message: string };
-
 /** 増減の向き。フォームでは金額を正の数で入力し、ここで符号を付ける。 */
 type Direction = "plus" | "minus";
 
-export async function createEvent(
-  _prevState: CreateEventState,
-  formData: FormData,
-): Promise<CreateEventState> {
+/** 失敗ならエラーメッセージ、成功なら null。他のアクションと戻り値を揃えている。 */
+export async function createEvent(formData: FormData): Promise<string | null> {
   const title = String(formData.get("title") ?? "").trim();
   const rawAmount = Number(formData.get("amount"));
   const direction = String(formData.get("direction") ?? "plus") as Direction;
 
   if (!Number.isInteger(rawAmount) || rawAmount <= 0) {
-    return { status: "error", message: "金額は1以上の整数で入力してください" };
+    return "金額は1以上の整数で入力してください";
   }
 
-  const amount = direction === "minus" ? -rawAmount : rawAmount;
-  const error = await send("/events", {
+  return send("/events", {
     method: "POST",
-    body: { title, amount },
+    body: { title, amount: direction === "minus" ? -rawAmount : rawAmount },
   });
-
-  return error ? { status: "error", message: error } : { status: "success" };
 }
 
 /** doneOn は "YYYY-MM-DD"。どの日にやったことにするかは呼び出し側が決める。 */

@@ -1,6 +1,6 @@
 import { Calendar } from "@/components/calendar";
 import { BalanceCard } from "@/components/balance-card";
-import { QuickRecord } from "@/components/quick-record";
+import { EventPanel } from "@/components/event-panel";
 import { getCurrentUser } from "@/lib/current-user";
 import { serverGetAsUser } from "@/lib/server-api";
 import {
@@ -66,7 +66,7 @@ export default async function Home(props: PageProps<"/">) {
 
         {/* スクロールしても押せるように、横並びのときは追従させる */}
         <div className="lg:sticky lg:top-6 lg:w-72 lg:shrink-0">
-          <QuickRecord events={events} todayKey={todayKey} />
+          <EventPanel events={events} todayKey={todayKey} />
         </div>
       </div>
     </Shell>
