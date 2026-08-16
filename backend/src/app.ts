@@ -2,7 +2,17 @@ import Fastify, { type FastifyError, type FastifyInstance } from "fastify";
 import cors from "@fastify/cors";
 import { healthRoutes } from "./routes/health.js";
 import { userRoutes } from "./routes/user.js";
+import { eventRoutes } from "./routes/event.js";
+import { withCurrentUser } from "./middleware/currentUser.js";
+import { EmailAlreadyExistsError, NotFoundError } from "./errors.js";
 import { env, isProd } from "./config/env.js";
+
+// ドメインエラーと HTTP ステータスの対応。
+// controller ごとに try/catch を書くと同じ変換が散らばるのでここに集める。
+const ERROR_STATUS: [new (...args: never[]) => Error, number][] = [
+  [NotFoundError, 404],
+  [EmailAlreadyExistsError, 409],
+];
 
 export function buildApp(): FastifyInstance {
   const app = Fastify({
@@ -34,6 +44,11 @@ export function buildApp(): FastifyInstance {
       return reply.code(400).send({ error: error.message });
     }
 
+    const domain = ERROR_STATUS.find(([type]) => error instanceof type);
+    if (domain) {
+      return reply.code(domain[1]).send({ error: error.message });
+    }
+
     const statusCode = error.statusCode ?? 500;
     if (statusCode >= 500) {
       request.log.error(error);
@@ -53,13 +68,14 @@ export function buildApp(): FastifyInstance {
   // ログイン機能はまだ無いので、ユーザー作成は公開ルートに置いている。
   app.register(userRoutes);
 
-  // --- 認証必須ルート ---
-  // 認証を入れるときは、このスコープに preHandler フックを付けて
-  // 認証が必要なルートをまとめて登録する。
-  // app.register(async (protectedRoutes) => {
-  //   protectedRoutes.addHook("preHandler", authenticate);
-  //   await protectedRoutes.register(userRoutes);
-  // });
+  // --- ユーザーに紐づくルート ---
+  // このスコープ内は X-User-Id で「誰のデータか」を決める。
+  // 認証を入れるときは withCurrentUser をトークン検証に差し替える。
+  app.register(async (userScopedRoutes) => {
+    userScopedRoutes.addHook("preHandler", withCurrentUser);
+
+    await userScopedRoutes.register(eventRoutes);
+  });
 
   return app;
 }
