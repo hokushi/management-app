@@ -3,24 +3,15 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint"
-  },
-  "dependencies": {
-    "next": "16.3.1",
-    "react": "19.2.8",
-    "react-dom": "19.2.8"
-  },
-  "devDependencies": {
-    "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "eslint": "^9",
-    "eslint-config-next": "16.3.1",
-    "tailwindcss": "^4",
-    "typescript": "^5"
+    "dev": "docker compose up -d && pnpm dev:front",
+    "up": "docker compose up -d",
+    "down": "docker compose down",
+    "logs": "docker compose logs -f backend",
+    "dev:front": "pnpm --filter frontend dev",
+    "build:front": "pnpm --filter frontend build",
+    "lint:front": "pnpm --filter frontend lint",
+    "dev:back": "pnpm --filter backend dev",
+    "build:back": "pnpm --filter backend build",
+    "start:back": "pnpm --filter backend start"
   }
 }

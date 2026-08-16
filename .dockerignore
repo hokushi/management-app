@@ -1,0 +1,17 @@
+# node_modules はコンテナ内で install する（ホストの macOS 向けバイナリを持ち込まない）
+**/node_modules
+# ビルド成果物
+**/dist
+**/.next
+**/build
+**/out
+# env / ローカル
+**/.env
+**/.env.local
+**/.env*.local
+# git / os
+.git
+**/.DS_Store
+# docker 自身
+**/Dockerfile*
+docker-compose.yml

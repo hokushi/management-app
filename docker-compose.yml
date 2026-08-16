@@ -1,0 +1,65 @@
+services:
+  db:
+    image: postgres:17
+    container_name: management-app-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: management_app
+    ports:
+      # ホスト側は 5434（5432 / 5433 は他プロジェクトが使っている想定）
+      - "5434:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # スキーマは Drizzle が管理する（backend で `pnpm db:push`）。
+      # ここでは空の DB を立てるだけ。
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d management_app"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # バックエンド（Fastify）。tsx watch でホットリロード。
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile.dev
+    container_name: management-app-backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: local
+      PORT: 4000
+      HOST: 0.0.0.0
+      # コンテナ内からは localhost ではなく db サービス名で繋ぐ
+      DATABASE_URL: postgres://postgres:postgres@db:5432/management_app
+    ports:
+      - "4000:4000"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      # ソースだけマウントしてホットリロード（node_modules はイメージ側を使う）
+      - ./backend/src:/app/backend/src
+
+  # DB を GUI で見るための pgAdmin（http://localhost:8081）
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: management-app-pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@example.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+      # 起動時に db サーバーを自動登録する
+      PGADMIN_SERVER_JSON_FILE: /pgadmin4/servers.json
+    ports:
+      - "8081:80"
+    depends_on:
+      - db
+    volumes:
+      - pgadmin:/var/lib/pgadmin
+      - ./db/pgadmin/servers.json:/pgadmin4/servers.json:ro
+
+volumes:
+  pgdata:
+  pgadmin:

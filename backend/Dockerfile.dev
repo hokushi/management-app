@@ -1,0 +1,48 @@
+# 開発用 Dockerfile（tsx watch でホットリロード）。
+# 本番用ではない。ビルドコンテキストはリポジトリのルート（docker-compose.yml 参照）。
+FROM node:22-slim
+
+# pnpm を corepack で有効化
+RUN corepack enable
+
+WORKDIR /app
+
+# 依存解決に必要なマニフェストだけ先にコピーして install レイヤーをキャッシュさせる
+COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
+COPY backend/package.json ./backend/package.json
+COPY frontend/package.json ./frontend/package.json
+
+# backend とその依存だけインストール（frontend の重い依存は入れない）。
+# pnpm 11 は未承認のビルドスクリプト検出で exit 1 になるが node_modules 自体は
+# 展開済みなので、そのケースだけは無視して続行する。
+# `|| true` で全部握りつぶすと、ネットワーク不調などの本物の失敗まで
+# 「ビルド成功」として通り、空の node_modules を抱えたイメージが焼かれる。
+RUN set -e; \
+    status=0; \
+    out="$(pnpm install --frozen-lockfile --filter backend... 2>&1)" || status=$?; \
+    printf '%s\n' "$out"; \
+    if [ "$status" -ne 0 ] && ! printf '%s' "$out" | grep -q 'ERR_PNPM_IGNORED_BUILDS'; then \
+      echo "pnpm install failed (exit $status)" >&2; \
+      exit "$status"; \
+    fi
+
+# esbuild（tsx が使うネイティブバイナリ）を明示的にビルドする
+RUN pnpm --filter backend rebuild esbuild
+
+# install が実際に成功したかを検証する。ここで落としておけば、
+# 壊れたイメージが起動時まで気づかれないまま残ることはない。
+RUN test -x backend/node_modules/.bin/drizzle-kit \
+    && test -x backend/node_modules/.bin/tsx \
+    || { echo "node_modules is incomplete (drizzle-kit / tsx not found)" >&2; exit 1; }
+
+# backend のソースをコピー（src は compose でマウントするので上書きされる）
+COPY backend ./backend
+
+WORKDIR /app/backend
+
+EXPOSE 4000
+
+# スキーマを反映してから dev サーバーを起動する。
+# pnpm 経由だと毎回ワークスペース全体の依存チェック（未承認ビルドで失敗）が走るため、
+# バイナリを直接叩く。tsx watch でホットリロード。
+CMD ["sh", "-c", "node_modules/.bin/drizzle-kit push && node_modules/.bin/tsx watch src/server.ts"]
