@@ -20,6 +20,8 @@ const createUserBodySchema = {
 } as const;
 
 export async function userRoutes(app: FastifyInstance) {
+  app.get("/users", userController.list);
+
   app.post(
     "/users",
     { schema: { body: createUserBodySchema } },

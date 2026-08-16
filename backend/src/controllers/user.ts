@@ -3,6 +3,10 @@ import { userService, type CreateUserInput } from "../services/user.js";
 import { EmailAlreadyExistsError } from "../errors.js";
 
 export const userController = {
+  async list() {
+    return { users: await userService.list() };
+  },
+
   async create(
     request: FastifyRequest<{ Body: CreateUserInput }>,
     reply: FastifyReply,

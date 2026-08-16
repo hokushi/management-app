@@ -49,6 +49,7 @@ pnpm dev
 | GET      | `/`          | サービス名            |
 | GET      | `/health`    | プロセスの生存確認    |
 | GET      | `/health/db` | DB まで含めた疎通確認 |
+| GET      | `/users`     | ユーザー一覧          |
 | POST     | `/users`     | ユーザー作成          |
 
 `POST /users` は `{ name, email, password }` を受け取り、パスワードを bcrypt で

@@ -20,6 +20,19 @@ export type User = {
 };
 
 export const userRepository = {
+  /** 全ユーザーを作成順で返す。ログインが無いうちは件数が知れているので絞り込みはしない。 */
+  async list(): Promise<User[]> {
+    return db
+      .select({
+        id: users.id,
+        name: users.name,
+        email: users.email,
+        createdAt: users.createdAt,
+      })
+      .from(users)
+      .orderBy(users.id);
+  },
+
   /**
    * ユーザーを1件作る。
    * メールが既に使われている場合は EmailAlreadyExistsError を投げる

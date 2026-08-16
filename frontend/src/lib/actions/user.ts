@@ -1,6 +1,9 @@
 "use server";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+import { cookies } from "next/headers";
+import { revalidatePath } from "next/cache";
+import { API_BASE } from "@/lib/server-api";
+import { CURRENT_USER_COOKIE, type User } from "@/lib/user";
 
 // 型は実行時に消えるのでここに置いてよいが、値（定数など）は置けない。
 // "use server" ファイルは async 関数しか export できず、実行時にエラーになる。
@@ -8,6 +11,8 @@ export type CreateUserState =
   | { status: "idle" }
   | { status: "success"; name: string }
   | { status: "error"; message: string };
+
+const ONE_YEAR_IN_SECONDS = 60 * 60 * 24 * 365;
 
 /**
  * ユーザー作成の Server Action。
@@ -41,8 +46,30 @@ export async function createUser(
       };
     }
 
-    return { status: "success", name };
+    // 作った直後はその人に切り替わっている方が自然なので選択状態にする
+    const { user } = (await res.json()) as { user: User };
+    await setCurrentUserCookie(user.id);
+    revalidatePath("/", "layout");
+
+    return { status: "success", name: user.name };
   } catch {
     return { status: "error", message: "サーバーに接続できませんでした" };
   }
+}
+
+/** 表示中のユーザーを切り替える。 */
+export async function selectUser(userId: number): Promise<void> {
+  await setCurrentUserCookie(userId);
+  // ヘッダーは layout にあるので layout ごと作り直す
+  revalidatePath("/", "layout");
+}
+
+async function setCurrentUserCookie(userId: number): Promise<void> {
+  const cookieStore = await cookies();
+  cookieStore.set(CURRENT_USER_COOKIE, String(userId), {
+    path: "/",
+    httpOnly: true,
+    sameSite: "lax",
+    maxAge: ONE_YEAR_IN_SECONDS,
+  });
 }

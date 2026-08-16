@@ -11,6 +11,10 @@ export type CreateUserInput = {
 };
 
 export const userService = {
+  async list(): Promise<User[]> {
+    return userRepository.list();
+  },
+
   /** ユーザーを作る。パスワードはハッシュ化してから渡す。 */
   async create({ name, email, password }: CreateUserInput): Promise<User> {
     const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
