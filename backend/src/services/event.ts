@@ -11,7 +11,7 @@ import { InvalidInputError } from "../errors.js";
  * 一覧に「その日に記録したらいくらになるか」を添えたもの。
  * fixed はいつでも amount ちょうど。streak は積み上がり具合で変わる。
  * nextAmount が null のときはその日には記録できない
- * （リセットのイベントを記録した日は、積み上がる方は発生しない）。
+ * （積み上がるイベントは1日1回まで）。
  */
 export type EventWithNextAmount = Event & { nextAmount: number | null };
 
@@ -23,14 +23,10 @@ export const eventService = {
     }
 
     assertRealDate(on);
-    // リセットの有無と起点は日付ごとに決まるので、イベントごとに引かずに1回で済ませる
-    const blocked = await eventLogRepository.hasResetOn(userId, on);
-    const lastReset = await eventLogRepository.lastResetBefore(userId, on);
-
     return Promise.all(
       events.map(async (event) => ({
         ...event,
-        nextAmount: await nextAmountFor(userId, event, on, blocked, lastReset),
+        nextAmount: await nextAmountFor(userId, event, on),
       })),
     );
   },
@@ -40,8 +36,11 @@ export const eventService = {
     title: string;
     amount: number;
     kind: Event["kind"];
-    resetsStreak: boolean;
+    resetsEventId: number | null;
   }): Promise<Event> {
+    if (input.resetsEventId !== null) {
+      await assertResettableTarget(input.userId, input.resetsEventId);
+    }
     return eventRepository.create({ ...input, title: input.title.trim() });
   },
 
@@ -51,7 +50,7 @@ export const eventService = {
 
   /**
    * イベントを「やった」ことにして記録を1件足す。
-   * 金額はイベントから写して保存するので、あとでイベントを直しても
+   * 金額とタイトルはイベントから写して保存するので、あとでイベントを直しても
    * この記録は変わらない。streak の場合は積み上がった額を計算して写す。
    */
   async record(
@@ -61,24 +60,10 @@ export const eventService = {
   ): Promise<EventLog> {
     assertRealDate(doneOn);
     const event = await eventRepository.findByIdForUser(eventId, userId);
-
-    const blocked = await eventLogRepository.hasResetOn(userId, doneOn);
-    const lastReset = await eventLogRepository.lastResetBefore(userId, doneOn);
-    const amount = await nextAmountFor(
-      userId,
-      event,
-      doneOn,
-      blocked,
-      lastReset,
-    );
+    const amount = await nextAmountFor(userId, event, doneOn);
 
     if (amount === null) {
-      // 断られる理由は2つ。どちらなのかを出さないと直しようがない。
-      throw new InvalidInputError(
-        blocked
-          ? "この日はリセットのイベントを記録しているため、積み上がるイベントは記録できません"
-          : "このイベントはこの日すでに記録しています",
-      );
+      throw new InvalidInputError("このイベントはこの日すでに記録しています");
     }
 
     return eventLogRepository.create({
@@ -86,7 +71,7 @@ export const eventService = {
       eventId: event.id,
       title: event.title,
       amount,
-      resetsStreak: event.resetsStreak,
+      resetsEventId: event.resetsEventId,
       doneOn,
     });
   },
@@ -109,8 +94,8 @@ export const eventService = {
 /**
  * その日に記録したらいくらになるか。記録できない日なら null。
  *
- * streak は「前回のリセットより後、その日より前」に何回記録したかで決まる。
- * 対象の日より前だけを数えるので、過去の日に付けても
+ * streak は「自分を対象にした直近のリセットより後、その日より前」に
+ * 何回記録したかで決まる。対象の日より前だけを数えるので、過去の日に付けても
  * その日時点であるべきだった額になる。
  *
  * 同じ日に2回目は記録させない。数えるのがその日より前の分だけである以上、
@@ -121,13 +106,15 @@ async function nextAmountFor(
   userId: number,
   event: Event,
   on: string,
-  blockedByReset: boolean,
-  lastReset: string | null,
 ): Promise<number | null> {
   if (event.kind !== "streak") return event.amount;
-  if (blockedByReset) return null;
   if (await eventLogRepository.hasLogOn(userId, event.id, on)) return null;
 
+  const lastReset = await eventLogRepository.lastResetBefore(
+    userId,
+    event.id,
+    on,
+  );
   const done = await eventLogRepository.countForStreak(
     userId,
     event.id,
@@ -135,6 +122,19 @@ async function nextAmountFor(
     on,
   );
   return event.amount * (done + 1);
+}
+
+/** リセットの相手は、自分以外の・自分が持っている・積み上がるイベントに限る。 */
+async function assertResettableTarget(
+  userId: number,
+  targetId: number,
+): Promise<void> {
+  const target = await eventRepository.findByIdForUser(targetId, userId);
+  if (target.kind !== "streak") {
+    throw new InvalidInputError(
+      "リセットの相手には、やるたびに増えるイベントを選んでください",
+    );
+  }
 }
 
 /**

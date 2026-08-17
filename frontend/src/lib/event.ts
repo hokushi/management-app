@@ -13,12 +13,15 @@ export type Event = {
   /** 円。fixed なら金額そのもの、streak なら1回あたりの増え幅。 */
   amount: number;
   kind: EventKind;
-  /** 記録すると積み上げが振り出しに戻る（例: ギャンブル）。 */
-  resetsStreak: boolean;
+  /**
+   * 記録すると、この id の積み上がるイベントを振り出しに戻す（例: ギャンブル → 散歩）。
+   * null なら何もリセットしない。効き始めるのは翌日から。
+   */
+  resetsEventId: number | null;
   createdAt: string;
   /**
    * その日に記録したらいくらになるか。null なら記録できない
-   * （リセットのイベントを記録した日は積み上がる方は発生しない）。
+   * （積み上がるイベントは1日1回まで）。
    * backend に ?on=YYYY-MM-DD を付けて取得したときだけ入る。
    */
   nextAmount: number | null;

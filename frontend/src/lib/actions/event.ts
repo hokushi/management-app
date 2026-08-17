@@ -13,8 +13,9 @@ export async function createEvent(formData: FormData): Promise<string | null> {
   const rawAmount = Number(formData.get("amount"));
   const direction = String(formData.get("direction") ?? "plus") as Direction;
   const kind = formData.get("kind") === "streak" ? "streak" : "fixed";
-  // チェックボックスは未チェックだと値自体が送られてこない
-  const resetsStreak = formData.get("resetsStreak") !== null;
+  // 「リセットしない」は空文字で送られてくる
+  const rawResets = String(formData.get("resetsEventId") ?? "");
+  const resetsEventId = rawResets === "" ? null : Number(rawResets);
 
   if (!Number.isInteger(rawAmount) || rawAmount <= 0) {
     return "金額は1以上の整数で入力してください";
@@ -26,7 +27,7 @@ export async function createEvent(formData: FormData): Promise<string | null> {
       title,
       amount: direction === "minus" ? -rawAmount : rawAmount,
       kind,
-      resetsStreak,
+      resetsEventId,
     },
   });
 }

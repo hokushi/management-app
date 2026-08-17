@@ -76,6 +76,7 @@ export function EventPanel({
             label="増える"
             dotClass="bg-emerald-500"
             events={plusEvents}
+            allEvents={events}
             isPending={isPending}
             onRecord={record}
             onRemove={remove}
@@ -84,6 +85,7 @@ export function EventPanel({
             label="減る"
             dotClass="bg-red-500"
             events={minusEvents}
+            allEvents={events}
             isPending={isPending}
             onRecord={record}
             onRemove={remove}
@@ -104,7 +106,7 @@ export function EventPanel({
         </p>
       )}
 
-      <AddEventDialog />
+      <AddEventDialog streakEvents={events.filter((e) => e.kind === "streak")} />
     </section>
   );
 }
@@ -113,6 +115,7 @@ function Group({
   label,
   dotClass,
   events,
+  allEvents,
   isPending,
   onRecord,
   onRemove,
@@ -120,6 +123,8 @@ function Group({
   label: string;
   dotClass: string;
   events: Event[];
+  /** リセット相手のタイトルを引くために全件を渡す */
+  allEvents: Event[];
   isPending: boolean;
   onRecord: (event: Event) => void;
   onRemove: (event: Event) => void;
@@ -140,13 +145,12 @@ function Group({
             <li key={event.id} className="flex items-stretch gap-1">
               <button
                 type="button"
-                // nextAmount が null の日は記録できない
-                // （リセットのイベントを記録した日は積み上がる方は発生しない）
+                // 積み上がるイベントは1日1回まで
                 disabled={isPending || event.nextAmount === null}
                 onClick={() => onRecord(event)}
                 title={
                   event.nextAmount === null
-                    ? "今日はもう記録済みか、リセットのイベントを記録しているため押せません"
+                    ? "このイベントは今日すでに記録しています"
                     : undefined
                 }
                 className="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-left text-sm transition-colors hover:bg-zinc-100 disabled:opacity-40 disabled:hover:bg-transparent dark:border-zinc-800 dark:hover:bg-zinc-800"
@@ -156,7 +160,7 @@ function Group({
                     {event.title}
                   </span>
                   <span className="block truncate text-xs text-zinc-500 dark:text-zinc-400">
-                    {eventNote(event)}
+                    {eventNote(event, allEvents)}
                   </span>
                 </span>
                 <span
@@ -185,19 +189,20 @@ function Group({
   );
 }
 
-/** ボタンの2行目。積み上げ幅やリセットの有無など、金額だけでは分からないことを出す。 */
-function eventNote(event: Event): string {
+/** ボタンの2行目。積み上げ幅やリセット相手など、金額だけでは分からないことを出す。 */
+function eventNote(event: Event, events: Event[]): string {
   const notes: string[] = [];
   if (event.kind === "streak") {
     notes.push(`${formatSignedYen(event.amount)}ずつ積み上げ`);
   }
-  if (event.resetsStreak) {
-    notes.push("積み上げをリセット");
+  if (event.resetsEventId !== null) {
+    const target = events.find((other) => other.id === event.resetsEventId);
+    notes.push(`「${target?.title ?? "削除済み"}」をリセット`);
   }
   return notes.join(" / ");
 }
 
-function AddEventDialog() {
+function AddEventDialog({ streakEvents }: { streakEvents: Event[] }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   // 閉じるたびにフォームを作り直して、前回の入力とエラーを消す
   const [formKey, setFormKey] = useState(0);
@@ -224,6 +229,7 @@ function AddEventDialog() {
       >
         <AddEventForm
           key={formKey}
+          streakEvents={streakEvents}
           onClose={() => dialogRef.current?.close()}
         />
       </dialog>
@@ -231,7 +237,13 @@ function AddEventDialog() {
   );
 }
 
-function AddEventForm({ onClose }: { onClose: () => void }) {
+function AddEventForm({
+  streakEvents,
+  onClose,
+}: {
+  streakEvents: Event[];
+  onClose: () => void;
+}) {
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   // 種類によってラベルと説明が変わるので、選択内容を持っておく
@@ -336,19 +348,26 @@ function AddEventForm({ onClose }: { onClose: () => void }) {
         </div>
       </div>
 
-      <label className="flex items-start gap-2 text-sm">
-        <input
-          name="resetsStreak"
-          type="checkbox"
-          className="mt-0.5 h-4 w-4 shrink-0 accent-zinc-900 dark:accent-zinc-100"
-        />
-        <span>
-          積み上げをリセットする
-          <span className="block text-xs text-zinc-500 dark:text-zinc-400">
-            これを記録した日は積み上がるイベントが発生せず、翌日から最初の額に戻ります。
-          </span>
-        </span>
-      </label>
+      {/* リセットの相手が居ないうちは出しても選べないので隠す */}
+      {streakEvents.length > 0 && (
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="event-resets" className="text-sm font-medium">
+            積み上げをリセットする
+          </label>
+          <select id="event-resets" name="resetsEventId" className={inputClass}>
+            <option value="">リセットしない</option>
+            {streakEvents.map((streakEvent) => (
+              <option key={streakEvent.id} value={streakEvent.id}>
+                「{streakEvent.title}」をリセット
+              </option>
+            ))}
+          </select>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">
+            これを記録すると、選んだ積み上げが翌日から最初の額に戻ります。
+            当日の記録はそのまま残ります。
+          </p>
+        </div>
+      )}
 
       <div className="flex justify-end gap-2">
         <button

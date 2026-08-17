@@ -24,7 +24,8 @@ const createEventBodySchema = {
       not: { const: 0 },
     },
     kind: { type: "string", enum: ["fixed", "streak"], default: "fixed" },
-    resetsStreak: { type: "boolean", default: false },
+    // 記録するとこの streak イベントを振り出しに戻す。null なら何もしない。
+    resetsEventId: { type: ["integer", "null"], default: null },
   },
 } as const;
 

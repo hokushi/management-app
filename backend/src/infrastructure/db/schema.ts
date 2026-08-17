@@ -1,7 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
   bigint,
-  boolean,
   check,
   date,
   index,
@@ -41,9 +40,8 @@ export const users = pgTable("users", {
 //   "fixed"  … 毎回 amount ちょうど。
 //   "streak" … 記録するたびに amount ずつ積み上がる。
 //              1回目 +amount、2回目 +amount*2、3回目 +amount*3…。
-//              resetsStreak のイベントを記録すると振り出しに戻る。
-//              日を飛ばしても積み上げは維持される（リセットするのは
-//              resetsStreak のイベントだけ）ので、数えるのは日数ではなく回数。
+//              自分を対象にしたリセットイベントを記録すると振り出しに戻る。
+//              日を飛ばしても積み上げは維持されるので、数えるのは日数ではなく回数。
 export const events = pgTable(
   "events",
   {
@@ -56,8 +54,10 @@ export const events = pgTable(
     title: text("title").notNull(),
     amount: integer("amount").notNull(),
     kind: text("kind").notNull().default("fixed"),
-    // 記録すると streak を振り出しに戻す（例: ギャンブル）
-    resetsStreak: boolean("resets_streak").notNull().default(false),
+    // 記録すると、この streak イベントを振り出しに戻す（例: ギャンブル → 散歩）。
+    // null なら何もリセットしない。1つのリセットが戻すのは1つだけだが、
+    // 同じ streak に向けたリセットイベントは何個でも作れる。
+    resetsEventId: bigint("resets_event_id", { mode: "number" }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -91,9 +91,10 @@ export const eventLogs = pgTable(
     ),
     title: text("title").notNull(),
     amount: integer("amount").notNull(),
-    // 元のイベントの resetsStreak を写して持つ。
-    // イベントを消しても「この日にリセットが起きた」事実は残す必要があるため。
-    resetsStreak: boolean("resets_streak").notNull().default(false),
+    // 元のイベントの resetsEventId を写して持つ（外部キーは張らない）。
+    // イベントを消しても「この日にどの積み上げがリセットされたか」は
+    // 残す必要があり、消えると過去の計算が変わってしまうため。
+    resetsEventId: bigint("resets_event_id", { mode: "number" }),
     // 「どの日にやったか」は日付であって時刻ではない。
     // timestamp で持つとタイムゾーン次第で前日/翌日に寄ってしまい、
     // カレンダーのどのマスに出すかが環境で変わる。date なら曖昧さが無い。

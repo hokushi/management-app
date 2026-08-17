@@ -10,7 +10,7 @@ type CreateEventBody = {
   title: string;
   amount: number;
   kind: "fixed" | "streak";
-  resetsStreak: boolean;
+  resetsEventId: number | null;
 };
 type RecordBody = { doneOn: string };
 type LogsQuery = { from?: string; to?: string; limit: number };

@@ -11,7 +11,8 @@ export type Event = {
   title: string;
   amount: number;
   kind: EventKind;
-  resetsStreak: boolean;
+  /** 記録するとこの streak イベントを振り出しに戻す。null なら何もしない。 */
+  resetsEventId: number | null;
   createdAt: Date;
 };
 
@@ -37,7 +38,7 @@ export type NewEvent = {
   title: string;
   amount: number;
   kind: EventKind;
-  resetsStreak: boolean;
+  resetsEventId: number | null;
 };
 
 const eventColumns = {
@@ -45,7 +46,7 @@ const eventColumns = {
   title: events.title,
   amount: events.amount,
   kind: sql<EventKind>`${events.kind}`.as("kind"),
-  resetsStreak: events.resetsStreak,
+  resetsEventId: events.resetsEventId,
   createdAt: events.createdAt,
 };
 
@@ -103,7 +104,7 @@ export const eventLogRepository = {
     eventId: number;
     title: string;
     amount: number;
-    resetsStreak: boolean;
+    resetsEventId: number | null;
     doneOn: string;
   }): Promise<EventLog> {
     const rows = await db.insert(eventLogs).values(input).returning(logColumns);
@@ -143,17 +144,24 @@ export const eventLogRepository = {
   },
 
   /**
-   * その日より前で、いちばん最近リセットが起きた日。1度も無ければ null。
-   * streak を「どこから数え直すか」の起点になる。
+   * その streak イベントを対象にしたリセットが、その日より前で
+   * いちばん最近起きた日。1度も無ければ null。数え直しの起点になる。
+   *
+   * 「その日より前」だけを見るので、リセットした当日はまだ影響を受けない
+   * （効くのは翌日から）。
    */
-  async lastResetBefore(userId: number, date: string): Promise<string | null> {
+  async lastResetBefore(
+    userId: number,
+    streakEventId: number,
+    date: string,
+  ): Promise<string | null> {
     const rows = await db
       .select({ doneOn: sql<string | null>`max(${eventLogs.doneOn})` })
       .from(eventLogs)
       .where(
         and(
           eq(eventLogs.userId, userId),
-          eq(eventLogs.resetsStreak, true),
+          eq(eventLogs.resetsEventId, streakEventId),
           lt(eventLogs.doneOn, date),
         ),
       );
@@ -173,22 +181,6 @@ export const eventLogRepository = {
         and(
           eq(eventLogs.userId, userId),
           eq(eventLogs.eventId, eventId),
-          eq(eventLogs.doneOn, date),
-        ),
-      )
-      .limit(1);
-    return rows.length > 0;
-  },
-
-  /** その日にリセットのイベントを記録しているか。 */
-  async hasResetOn(userId: number, date: string): Promise<boolean> {
-    const rows = await db
-      .select({ id: eventLogs.id })
-      .from(eventLogs)
-      .where(
-        and(
-          eq(eventLogs.userId, userId),
-          eq(eventLogs.resetsStreak, true),
           eq(eventLogs.doneOn, date),
         ),
       )
