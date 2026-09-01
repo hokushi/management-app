@@ -87,12 +87,19 @@ export function parseMonthParam(
   return { year, month };
 }
 
-/** その月の初日と末日（記録を月単位で引くときの範囲）。 */
-export function monthRange(yearMonth: YearMonth): { from: string; to: string } {
-  const { year, month } = yearMonth;
+/**
+ * カレンダーに出るマス全体の範囲（前後の月からはみ出した日を含む）。
+ *
+ * 記録を引く範囲はここに合わせる。月初〜月末だけを引くと、月をまたぐ
+ * 最初と最後の週で合計が欠けてしまうため（9月なら 8/31 の分が第1週に入らない）。
+ */
+export function gridRange(yearMonth: YearMonth): { from: string; to: string } {
+  const weeks = buildMonthWeeks(yearMonth);
+  const firstWeek = weeks[0]!;
+  const lastWeek = weeks[weeks.length - 1]!;
   return {
-    from: toDateKey(new Date(year, month, 1)),
-    to: toDateKey(new Date(year, month + 1, 0)),
+    from: firstWeek[0]!.dateKey,
+    to: lastWeek[lastWeek.length - 1]!.dateKey,
   };
 }
 
