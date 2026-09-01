@@ -1,38 +1,58 @@
 # management-app
 
-管理アプリ。Next.js (App Router) + TypeScript + Tailwind CSS で構築しています。
+pnpm workspace の monorepo。
 
-## 技術スタック
+```
+management-app/
+├── frontend/            Next.js（App Router）+ Tailwind CSS
+├── backend/             Fastify + Drizzle ORM + PostgreSQL
+├── db/pgadmin/          pgAdmin の初期設定（サーバー自動登録）
+└── docker-compose.yml   db / backend / pgadmin
+```
 
-| 項目 | 内容 |
-| --- | --- |
-| フレームワーク | Next.js 16 (App Router / Turbopack) |
-| 言語 | TypeScript |
-| スタイル | Tailwind CSS v4 |
-| Lint | ESLint (eslint-config-next) |
+## 前提
+
+- Node.js 22 以上
+- pnpm 11 以上
+- Docker Desktop
 
 ## セットアップ
 
 ```bash
-npm install
-npm run dev
+pnpm install
+cp frontend/.env.example frontend/.env.local
+cp backend/.env.example backend/.env.local   # ホストで backend を直接動かす場合のみ
 ```
 
-http://localhost:3000 を開くと確認できます。
-
-## スクリプト
+## 起動
 
 ```bash
-npm run dev     # 開発サーバー起動
-npm run build   # 本番ビルド
-npm run start   # 本番サーバー起動
-npm run lint    # ESLint 実行
+pnpm dev     # docker compose up -d してから frontend の dev サーバーを起動
 ```
 
-## ディレクトリ構成
+個別に動かす場合:
 
+```bash
+pnpm up          # db / backend / pgadmin を docker で起動
+pnpm down        # 停止
+pnpm logs        # backend のログを追う
+pnpm dev:front   # frontend だけ（http://localhost:3000）
+pnpm dev:back    # backend だけホストで起動（docker の backend は落としておく）
 ```
-src/
-  app/          # App Router のページ・レイアウト
-public/         # 静的ファイル
-```
+
+## ポート
+
+| サービス | URL                     |
+| -------- | ----------------------- |
+| frontend | http://localhost:3000   |
+| backend  | http://localhost:4000   |
+| pgAdmin  | http://localhost:8081   |
+| Postgres | `localhost:5434`        |
+
+pgAdmin のログインは `admin@example.com` / `admin`、DB のパスワードは `postgres`。
+
+## DB スキーマ
+
+`backend/src/infrastructure/db/schema.ts` に「あるべき完成形」を宣言し、
+`pnpm --filter backend db:push` で差分を DB に当てる。
+docker で backend を起動した場合は起動時に自動で実行される。
