@@ -4,7 +4,7 @@ import { EventPanel } from "@/components/event-panel";
 import { getCurrentUser } from "@/lib/current-user";
 import { serverGetAsUser } from "@/lib/server-api";
 import {
-  monthRange,
+  gridRange,
   parseMonthParam,
   todayKeyInJst,
   yearMonthOfDateKey,
@@ -36,8 +36,9 @@ export default async function Home(props: PageProps<"/">) {
     );
   }
 
-  // カレンダーは表示中の月の記録だけを引く。残高は全期間の合計。
-  const { from, to } = monthRange(viewMonth);
+  // カレンダーは表示中のマスの分だけを引く（週の合計を出すため、月初ではなく
+  // グリッド全体）。残高は全期間の合計。
+  const { from, to } = gridRange(viewMonth);
   const [balanceData, logsData, eventsData] = await Promise.all([
     serverGetAsUser<{ balance: number }>("/balance", user.id),
     serverGetAsUser<{ logs: EventLog[] }>(

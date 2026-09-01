@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import Link from "next/link";
 import {
   WEEKDAY_LABELS,
@@ -12,11 +12,22 @@ import {
   yearMonthOfDateKey,
   type YearMonth,
 } from "@/lib/calendar";
-import { formatSignedYen, type Event, type EventLog } from "@/lib/event";
+import {
+  amountClass,
+  formatSignedYen,
+  formatYen,
+  sumAmounts,
+  type Event,
+  type EventLog,
+} from "@/lib/event";
 import { DayDialog } from "./day-dialog";
 
 // 1マスに出す記録の数。これを超えた分は「他 n件」にまとめる。
 const MAX_LOGS_PER_CELL = 2;
+
+// 曜日7列＋右端の週計1列。ヘッダーと本体で同じ定義を使い、列をずらさない。
+const gridClass =
+  "grid grid-cols-[repeat(7,minmax(0,1fr))_3.25rem] sm:grid-cols-[repeat(7,minmax(0,1fr))_5rem]";
 
 const navLinkClass =
   "flex h-9 items-center justify-center rounded-md border border-zinc-200 px-3 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-900";
@@ -76,7 +87,9 @@ export function Calendar({
         </div>
       </header>
 
-      <div className="grid grid-cols-7 border-b border-zinc-200 dark:border-zinc-800">
+      <div
+        className={`${gridClass} border-b border-zinc-200 dark:border-zinc-800`}
+      >
         {WEEKDAY_LABELS.map((label, weekday) => (
           <div
             key={label}
@@ -85,61 +98,73 @@ export function Calendar({
             {label}
           </div>
         ))}
+        <div className="border-l border-zinc-200 py-2 text-center text-xs font-medium text-zinc-500 dark:border-zinc-800 dark:text-zinc-400">
+          週計
+        </div>
       </div>
 
       {/* 罫線は各セルの上/左ボーダーで引き、外周は親の border に任せる */}
-      <div className="grid grid-cols-7">
-        {weeks.map((week, weekIndex) =>
-          week.map(({ dateKey, date, isCurrentMonth }, weekday) => {
-            const logs = logsByDate[dateKey] ?? [];
-            const isToday = dateKey === todayKey;
+      <div className={gridClass}>
+        {weeks.map((week, weekIndex) => (
+          <Fragment key={week[0]!.dateKey}>
+            {week.map(({ dateKey, date, isCurrentMonth }, weekday) => {
+              const logs = logsByDate[dateKey] ?? [];
+              const isToday = dateKey === todayKey;
 
-            return (
-              <button
-                key={dateKey}
-                type="button"
-                onClick={() => setOpenDateKey(dateKey)}
-                aria-label={`${date.getMonth() + 1}月${date.getDate()}日の記録`}
-                className={`flex min-h-20 flex-col items-stretch gap-1 border-zinc-200 p-1.5 text-left transition-colors hover:bg-zinc-100 dark:border-zinc-800 dark:hover:bg-zinc-900 sm:min-h-24 sm:p-2 ${
-                  weekIndex > 0 ? "border-t" : ""
-                } ${weekday > 0 ? "border-l" : ""} ${
-                  isCurrentMonth ? "" : "bg-zinc-50/70 dark:bg-zinc-900/40"
-                }`}
-              >
-                <time
-                  dateTime={dateKey}
-                  className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-sm tabular-nums ${
-                    isToday
-                      ? "bg-zinc-900 font-semibold text-white dark:bg-zinc-100 dark:text-zinc-900"
-                      : weekdayTextClass(weekday, isCurrentMonth)
+              return (
+                <button
+                  key={dateKey}
+                  type="button"
+                  onClick={() => setOpenDateKey(dateKey)}
+                  aria-label={`${date.getMonth() + 1}月${date.getDate()}日の記録`}
+                  className={`flex min-h-20 flex-col items-stretch gap-1 border-zinc-200 p-1.5 text-left transition-colors hover:bg-zinc-100 dark:border-zinc-800 dark:hover:bg-zinc-900 sm:min-h-24 sm:p-2 ${
+                    weekIndex > 0 ? "border-t" : ""
+                  } ${weekday > 0 ? "border-l" : ""} ${
+                    isCurrentMonth ? "" : "bg-zinc-50/70 dark:bg-zinc-900/40"
                   }`}
                 >
-                  {date.getDate()}
-                </time>
+                  <time
+                    dateTime={dateKey}
+                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-sm tabular-nums ${
+                      isToday
+                        ? "bg-zinc-900 font-semibold text-white dark:bg-zinc-100 dark:text-zinc-900"
+                        : weekdayTextClass(weekday, isCurrentMonth)
+                    }`}
+                  >
+                    {date.getDate()}
+                  </time>
 
-                <span className="flex min-w-0 flex-col gap-0.5">
-                  {logs.slice(0, MAX_LOGS_PER_CELL).map((log) => (
-                    <span
-                      key={log.id}
-                      className={`truncate rounded px-1 text-[11px] leading-4 ${
-                        log.amount < 0
-                          ? "bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-400"
-                          : "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400"
-                      }`}
-                    >
-                      {formatSignedYen(log.amount)} {log.title}
-                    </span>
-                  ))}
-                  {logs.length > MAX_LOGS_PER_CELL && (
-                    <span className="px-1 text-[11px] leading-4 text-zinc-500 dark:text-zinc-400">
-                      他 {logs.length - MAX_LOGS_PER_CELL}件
-                    </span>
-                  )}
-                </span>
-              </button>
-            );
-          }),
-        )}
+                  <span className="flex min-w-0 flex-col gap-0.5">
+                    {logs.slice(0, MAX_LOGS_PER_CELL).map((log) => (
+                      <span
+                        key={log.id}
+                        className={`truncate rounded px-1 text-[11px] leading-4 ${
+                          log.amount < 0
+                            ? "bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-400"
+                            : "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400"
+                        }`}
+                      >
+                        {formatSignedYen(log.amount)} {log.title}
+                      </span>
+                    ))}
+                    {logs.length > MAX_LOGS_PER_CELL && (
+                      <span className="px-1 text-[11px] leading-4 text-zinc-500 dark:text-zinc-400">
+                        他 {logs.length - MAX_LOGS_PER_CELL}件
+                      </span>
+                    )}
+                  </span>
+                </button>
+              );
+            })}
+
+            <WeekTotal
+              total={sumAmounts(
+                week.flatMap((cell) => logsByDate[cell.dateKey] ?? []),
+              )}
+              isFirstWeek={weekIndex === 0}
+            />
+          </Fragment>
+        ))}
       </div>
 
       {openDateKey && (
@@ -151,6 +176,35 @@ export function Calendar({
         />
       )}
     </section>
+  );
+}
+
+/**
+ * その週のプラスマイナス。前後の月からはみ出した日の分も含める
+ * （週として見たときの増減なので、月の境目で切らない）。
+ */
+function WeekTotal({
+  total,
+  isFirstWeek,
+}: {
+  total: number;
+  isFirstWeek: boolean;
+}) {
+  return (
+    <div
+      className={`flex min-h-20 flex-col items-end border-l border-zinc-200 bg-zinc-50/70 p-1.5 dark:border-zinc-800 dark:bg-zinc-900/40 sm:min-h-24 sm:p-2 ${
+        isFirstWeek ? "" : "border-t"
+      }`}
+    >
+      {/* 日付の丸（h-6）と高さを揃えて、行の頭で目線が合うようにする */}
+      <span
+        className={`flex h-6 items-center text-[11px] font-medium tabular-nums sm:text-xs ${
+          total === 0 ? "text-zinc-400 dark:text-zinc-600" : amountClass(total)
+        }`}
+      >
+        {total === 0 ? formatYen(0) : formatSignedYen(total)}
+      </span>
+    </div>
   );
 }
 

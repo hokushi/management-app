@@ -48,6 +48,11 @@ export function groupLogsByDate(
   return grouped;
 }
 
+/** 記録の合計。週ごとのプラスマイナスを出すのに使う。 */
+export function sumAmounts(logs: EventLog[]): number {
+  return logs.reduce((total, log) => total + log.amount, 0);
+}
+
 /**
  * 3桁ごとにカンマを入れる。
  * toLocaleString は環境によって結果が変わりうる（＝サーバーとブラウザで
