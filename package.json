@@ -7,6 +7,8 @@
     "up": "docker compose up -d",
     "down": "docker compose down",
     "logs": "docker compose logs -f backend",
+    "db:dump": "mkdir -p db/dump && docker compose exec -T db pg_dump -U postgres -d management_app -Fc > db/dump/management_app.dump",
+    "db:restore": "docker compose exec -T db pg_restore -U postgres -d management_app --clean --if-exists < db/dump/management_app.dump",
     "dev:front": "pnpm --filter frontend dev",
     "build:front": "pnpm --filter frontend build",
     "lint:front": "pnpm --filter frontend lint",

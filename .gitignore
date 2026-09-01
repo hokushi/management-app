@@ -27,3 +27,5 @@ pnpm-debug.log*
 # docker / db
 pgdata/
 *.dump
+# ローカル DB のバックアップ（実データなので commit しない）
+db/dump/
