@@ -38,14 +38,31 @@ export type EventLog = {
 };
 
 /** 記録を日付ごとにまとめる。カレンダーのマスに置くために使う。 */
-export function groupLogsByDate(
-  logs: EventLog[],
-): Record<string, EventLog[]> {
+export function groupLogsByDate(logs: EventLog[]): Record<string, EventLog[]> {
   const grouped: Record<string, EventLog[]> = {};
   for (const log of logs) {
     (grouped[log.doneOn] ??= []).push(log);
   }
+  for (const dayLogs of Object.values(grouped)) {
+    dayLogs.sort(compareForDisplay);
+  }
   return grouped;
+}
+
+/**
+ * 1日の中の並び順。減る記録を先に出し、マイナス・プラスのどちらの側も
+ * 額の大きいものを上にする（-800, -300, +1000, +200 の順）。
+ *
+ * マスには先頭の数件しか出ないので、影響の大きいものから見せたい。
+ * 額が並んだときは記録した順にして、表示のたびに入れ替わらないようにする。
+ */
+function compareForDisplay(a: EventLog, b: EventLog): number {
+  const aIsMinus = a.amount < 0;
+  const bIsMinus = b.amount < 0;
+  if (aIsMinus !== bIsMinus) return aIsMinus ? -1 : 1;
+
+  const byMagnitude = Math.abs(b.amount) - Math.abs(a.amount);
+  return byMagnitude !== 0 ? byMagnitude : a.id - b.id;
 }
 
 /** 記録の合計。週ごとのプラスマイナスを出すのに使う。 */
