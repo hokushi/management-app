@@ -27,7 +27,7 @@ const MAX_LOGS_PER_CELL = 2;
 
 // 曜日7列＋右端の週計1列。ヘッダーと本体で同じ定義を使い、列をずらさない。
 const gridClass =
-  "grid grid-cols-[repeat(7,minmax(0,1fr))_3.25rem] sm:grid-cols-[repeat(7,minmax(0,1fr))_5rem]";
+  "grid grid-cols-[repeat(7,minmax(0,1fr))_4.25rem] sm:grid-cols-[repeat(7,minmax(0,1fr))_6rem]";
 
 const navLinkClass =
   "flex h-9 items-center justify-center rounded-md border border-zinc-200 px-3 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-900";
@@ -158,9 +158,7 @@ export function Calendar({
             })}
 
             <WeekTotal
-              total={sumAmounts(
-                week.flatMap((cell) => logsByDate[cell.dateKey] ?? []),
-              )}
+              logs={week.flatMap((cell) => logsByDate[cell.dateKey] ?? [])}
               isFirstWeek={weekIndex === 0}
             />
           </Fragment>
@@ -182,17 +180,24 @@ export function Calendar({
 /**
  * その週のプラスマイナス。前後の月からはみ出した日の分も含める
  * （週として見たときの増減なので、月の境目で切らない）。
+ *
+ * 差し引きの下に、増えた分と減った分の内訳を出す。
+ * ただし片側しか無い週は内訳が差し引きと同じ額になるので、そのときは出さない。
  */
 function WeekTotal({
-  total,
+  logs,
   isFirstWeek,
 }: {
-  total: number;
+  logs: EventLog[];
   isFirstWeek: boolean;
 }) {
+  const total = sumAmounts(logs);
+  const plus = sumAmounts(logs.filter((log) => log.amount > 0));
+  const minus = sumAmounts(logs.filter((log) => log.amount < 0));
+
   return (
     <div
-      className={`flex min-h-20 flex-col items-end border-l border-zinc-200 bg-zinc-50/70 p-1.5 dark:border-zinc-800 dark:bg-zinc-900/40 sm:min-h-24 sm:p-2 ${
+      className={`flex min-h-20 flex-col items-end gap-0.5 border-l border-zinc-200 bg-zinc-50/70 p-1.5 dark:border-zinc-800 dark:bg-zinc-900/40 sm:min-h-24 sm:p-2 ${
         isFirstWeek ? "" : "border-t"
       }`}
     >
@@ -204,6 +209,21 @@ function WeekTotal({
       >
         {total === 0 ? formatYen(0) : formatSignedYen(total)}
       </span>
+
+      {plus > 0 && minus < 0 && (
+        <>
+          <span
+            className={`text-[10px] leading-4 tabular-nums sm:text-[11px] ${amountClass(plus)}`}
+          >
+            {formatSignedYen(plus)}
+          </span>
+          <span
+            className={`text-[10px] leading-4 tabular-nums sm:text-[11px] ${amountClass(minus)}`}
+          >
+            {formatSignedYen(minus)}
+          </span>
+        </>
+      )}
     </div>
   );
 }
