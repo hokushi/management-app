@@ -6,6 +6,7 @@ import { WEEKDAY_LABELS, parseDateKey } from "@/lib/calendar";
 import {
   amountClass,
   formatSignedYen,
+  sumAmounts,
   type Event,
   type EventLog,
 } from "@/lib/event";
@@ -105,6 +106,22 @@ export function DayDialog({
                 </li>
               ))}
             </ul>
+          )}
+
+          {/* カレンダーのマスと同じ額を、開いたときにも確かめられるようにする */}
+          {logs.length > 0 && (
+            <div className="flex items-center justify-between gap-2 border-t border-zinc-200 px-3 pt-2 dark:border-zinc-800">
+              <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                合計
+              </span>
+              <span
+                className={`text-sm font-semibold tabular-nums ${amountClass(
+                  sumAmounts(logs),
+                )}`}
+              >
+                {formatSignedYen(sumAmounts(logs))}
+              </span>
+            </div>
           )}
         </section>
 

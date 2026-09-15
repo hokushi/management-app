@@ -123,16 +123,32 @@ export function Calendar({
                     isCurrentMonth ? "" : "bg-zinc-50/70 dark:bg-zinc-900/40"
                   }`}
                 >
-                  <time
-                    dateTime={dateKey}
-                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-sm tabular-nums ${
-                      isToday
-                        ? "bg-zinc-900 font-semibold text-white dark:bg-zinc-100 dark:text-zinc-900"
-                        : weekdayTextClass(weekday, isCurrentMonth)
-                    }`}
-                  >
-                    {date.getDate()}
-                  </time>
+                  {/*
+                    その日の合計は日付の右に置く。空いている場所なので
+                    縦を使わずに済み、列を上から下へ目で追える。
+                  */}
+                  <span className="flex items-center justify-between gap-1">
+                    <time
+                      dateTime={dateKey}
+                      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-sm tabular-nums ${
+                        isToday
+                          ? "bg-zinc-900 font-semibold text-white dark:bg-zinc-100 dark:text-zinc-900"
+                          : weekdayTextClass(weekday, isCurrentMonth)
+                      }`}
+                    >
+                      {date.getDate()}
+                    </time>
+
+                    {logs.length > 0 && (
+                      <span
+                        className={`truncate text-[11px] font-semibold tabular-nums ${amountClass(
+                          sumAmounts(logs),
+                        )}`}
+                      >
+                        {formatSignedYen(sumAmounts(logs))}
+                      </span>
+                    )}
+                  </span>
 
                   <span className="flex min-w-0 flex-col gap-0.5">
                     {logs.slice(0, MAX_LOGS_PER_CELL).map((log) => (
