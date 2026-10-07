@@ -36,7 +36,7 @@ pnpm dev     # docker compose up -d してから frontend の dev サーバー�
 pnpm up          # db / backend / pgadmin を docker で起動
 pnpm down        # 停止
 pnpm logs        # backend のログを追う
-pnpm dev:front   # frontend だけ（http://localhost:3000）
+pnpm dev:front   # frontend だけ（http://localhost:3100）
 pnpm dev:back    # backend だけホストで起動（docker の backend は落としておく）
 ```
 
@@ -44,10 +44,15 @@ pnpm dev:back    # backend だけホストで起動（docker の backend は落�
 
 | サービス | URL                     |
 | -------- | ----------------------- |
-| frontend | http://localhost:3000   |
+| frontend | http://localhost:3100   |
 | backend  | http://localhost:4000   |
 | pgAdmin  | http://localhost:8081   |
 | Postgres | `localhost:5434`        |
+
+ポートは他プロジェクトとぶつからない値に固定してある。frontend は Next.js の
+既定の 3000 ではなく 3100（3000 / 3001 は他プロジェクトが使っている想定）、
+Postgres も 5432 / 5433 を避けて 5434 にしている。空いている番号に逃げられると
+ブックマークや CORS の設定が毎回変わるので、固定しておく。
 
 pgAdmin のログインは `admin@example.com` / `admin`、DB のパスワードは `postgres`。
 
